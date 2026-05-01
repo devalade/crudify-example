@@ -1,0 +1,11 @@
+model: Vote
+
+fields:
+  titre:
+    type: string
+
+  nombre_de_vote:
+    type: integer
+
+  photo:
+    type: image

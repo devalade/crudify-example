@@ -1,0 +1,194 @@
+<?php
+
+use Livewire\Component;
+use Livewire\WithPagination;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
+use App\Models\Vote;
+
+new
+#[Layout('components.layouts.app')]
+#[Title('Votes')]
+class extends Component
+{
+    use WithPagination;
+
+    public string $search = '';
+    public string $sortField = 'id';
+    public string $sortDirection = 'desc';
+    public int $perPage = 10;
+    protected array $sortable = ['id', 'titre', 'nombre_de_vote'];
+
+    public string $titre = '';
+    public string $searchPlaceholder = 'Search titre...';
+    public string $inlineSuggestion = '';
+
+    public function updatedSearch(): void
+    {
+        if (empty($this->search)) {
+            $this->inlineSuggestion = '';
+
+            return;
+        }
+
+        $suggestion = \App\Models\Vote::query()
+            ->where('titre', 'like', $this->search . '%')
+            ->value('titre');
+
+        if ($suggestion && str_starts_with(strtolower($suggestion), strtolower($this->search))) {
+            $this->inlineSuggestion = substr($suggestion, strlen($this->search));
+
+            return;
+        }
+
+        $this->inlineSuggestion = '';
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingPerPage(): void
+    {
+        $this->resetPage();
+    }
+
+    public function sortBy(string $field): void
+    {
+        if (! in_array($field, $this->sortable, true)) {
+            return;
+        }
+
+        $this->resetPage();
+
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
+        }
+    }
+
+    public function delete(int $id): void
+    {
+        Vote::findOrFail($id)->delete();
+        $this->resetPage();
+        session()->flash('success', 'Vote deleted successfully.');
+    }
+
+    protected function getSortField(): string
+    {
+        return in_array($this->sortField, $this->sortable, true) ? $this->sortField : 'id';
+    }
+
+    protected function getSortDirection(): string
+    {
+        return $this->sortDirection === 'asc' ? 'asc' : 'desc';
+    }
+
+    public function render()
+    {
+        return view('pages.votes.index', [
+            'votes' => Vote::query()
+                ->when($this->search, fn($query) => $query->where(function($q) {
+                    $q->orWhere('titre', 'like', '%' . $this->search . '%');
+                }))
+                ->orderBy($this->getSortField(), $this->getSortDirection())
+                ->paginate($this->perPage),
+        ]);
+    }
+};
+?>
+
+<div class="mx-auto max-w-7xl space-y-6 px-4 pt-4 pb-8 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <flux:heading size="xl">Votes</flux:heading>
+            <flux:text class="mt-1">Manage records.</flux:text>
+        </div>
+
+        <flux:button href="/votes/create" variant="primary">Create New</flux:button>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_9rem]">
+        <div class="relative w-full" x-data>
+            <flux:input
+                type="search"
+                wire:model.live.debounce.300ms="search"
+                placeholder="{{ $searchPlaceholder }}"
+                x-on:keydown.tab="if($wire.inlineSuggestion) { $event.preventDefault(); $wire.set('search', $wire.search + $wire.inlineSuggestion) }"
+                x-on:keydown.right="if($wire.inlineSuggestion && $el.selectionStart === $el.value.length) { $event.preventDefault(); $wire.set('search', $wire.search + $wire.inlineSuggestion) }"
+            />
+            <div x-show="$wire.search.length > 0 && $wire.inlineSuggestion.length > 0" class="absolute inset-y-0 left-0 flex items-center pointer-events-none px-3 font-sans text-sm overflow-hidden whitespace-pre z-10 text-zinc-400">
+                <span class="opacity-0" x-text="$wire.search"></span><span class="opacity-50" x-text="$wire.inlineSuggestion"></span>
+            </div>
+        </div>
+
+        <flux:select wire:model.live="perPage">
+            <option value="10">10 per page</option>
+            <option value="25">25 per page</option>
+            <option value="50">50 per page</option>
+            <option value="100">100 per page</option>
+        </flux:select>
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div class="overflow-x-auto">
+            <flux:table>
+                <flux:table.columns>
+                    <flux:table.column wire:click="sortBy('titre')" class="cursor-pointer">Titre @if($sortField === 'titre') @if($sortDirection === 'asc') &#9650; @else &#9660; @endif @endif</flux:table.column>
+                    <flux:table.column wire:click="sortBy('nombre_de_vote')" class="cursor-pointer">Nombre De Vote @if($sortField === 'nombre_de_vote') @if($sortDirection === 'asc') &#9650; @else &#9660; @endif @endif</flux:table.column>
+                    <flux:table.column>Media</flux:table.column>
+                    <flux:table.column align="end">Actions</flux:table.column>
+                </flux:table.columns>
+
+                <flux:table.rows>
+                    @forelse($votes as $vote)
+                        <flux:table.row>
+                            <flux:table.cell>{{ Str::limit($vote->titre, 30) }}</flux:table.cell>
+                            <flux:table.cell>{{ Str::limit($vote->nombre_de_vote, 30) }}</flux:table.cell>
+                            <flux:table.cell>
+                                @if($vote->photo)
+                                    @if(Str::endsWith($vote->photo, ['.jpg', '.jpeg', '.png', '.gif', '.webp']))
+                                        <img src="{{ asset('storage/' . $vote->photo) }}" class="h-10 w-10 rounded-lg object-cover" />
+                                    @elseif(Str::endsWith($vote->photo, ['.mp4', '.mov', '.avi', '.webm', '.mkv']))
+                                        <video src="{{ asset('storage/' . $vote->photo) }}" class="h-10 w-10 rounded-lg object-cover" muted preload="metadata"></video>
+                                    @else
+                                        <flux:button size="sm" variant="ghost" href="{{ asset('storage/' . $vote->photo) }}" target="_blank">File</flux:button>
+                                    @endif
+                                @else
+                                    <span class="text-zinc-400">—</span>
+                                @endif
+                            </flux:table.cell>
+                            <flux:table.cell align="end">
+                                <div class="flex justify-end gap-2">
+                                    <flux:button size="sm" variant="ghost" href="/votes/{{ $vote->getKey() }}/show">View</flux:button>
+                                    <flux:button size="sm" variant="subtle" href="{{ route('votes.edit', $vote) }}">Edit</flux:button>
+                                    <flux:button
+                                        size="sm"
+                                        variant="danger"
+                                        wire:click="delete({{ $vote->id }})"
+                                        wire:confirm="Are you sure you want to delete this Vote?"
+                                    >
+                                        Delete
+                                    </flux:button>
+                                </div>
+                            </flux:table.cell>
+                        </flux:table.row>
+                    @empty
+                        <flux:table.row>
+                            <flux:table.cell colspan="5" class="py-10 text-center text-zinc-500">
+                                No records found.
+                            </flux:table.cell>
+                        </flux:table.row>
+                    @endforelse
+                </flux:table.rows>
+            </flux:table>
+        </div>
+    </div>
+
+    @if($votes->hasPages())
+        {{ $votes->links() }}
+    @endif
+</div>
