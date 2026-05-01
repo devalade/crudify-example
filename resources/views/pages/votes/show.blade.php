@@ -24,6 +24,18 @@ class extends Component
         session()->flash('success', 'Vote deleted successfully.');
         $this->redirectRoute('votes.index');
     }
+
+    public function incrementVote(): void
+    {
+        $this->vote->increment('nombre_de_vote');
+    }
+
+    public function decrementVote(): void
+    {
+        if ($this->vote->nombre_de_vote > 0) {
+            $this->vote->decrement('nombre_de_vote');
+        }
+    }
 };
 ?>
 
@@ -51,13 +63,19 @@ class extends Component
 
     <div class="space-y-2">
         <flux:subheading>Nombre De Vote</flux:subheading>
-        <flux:text>
-            @if(filled($vote->nombre_de_vote))
-                {{ $vote->nombre_de_vote }}
-            @else
-                <span class="text-zinc-400">—</span>
-            @endif
-        </flux:text>
+        <div class="flex items-center gap-3">
+            <flux:text>
+                @if(filled($vote->nombre_de_vote))
+                    {{ $vote->nombre_de_vote }}
+                @else
+                    <span class="text-zinc-400">—</span>
+                @endif
+            </flux:text>
+            <flux:button.group>
+                <flux:button size="sm" variant="subtle" wire:click="incrementVote">+</flux:button>
+                <flux:button size="sm" variant="subtle" wire:click="decrementVote">−</flux:button>
+            </flux:button.group>
+        </div>
     </div>
 
     <div class="space-y-2">

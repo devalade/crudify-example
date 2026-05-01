@@ -70,6 +70,20 @@ class extends Component
         }
     }
 
+    public function incrementVote(int $id): void
+    {
+        Vote::findOrFail($id)->increment('nombre_de_vote');
+    }
+
+    public function decrementVote(int $id): void
+    {
+        $vote = Vote::findOrFail($id);
+
+        if ($vote->nombre_de_vote > 0) {
+            $vote->decrement('nombre_de_vote');
+        }
+    }
+
     public function delete(int $id): void
     {
         Vote::findOrFail($id)->delete();
@@ -162,7 +176,11 @@ class extends Component
                                 @endif
                             </flux:table.cell>
                             <flux:table.cell align="end">
-                                <div class="flex justify-end gap-2">
+                                <div class="flex justify-end gap-2 items-center">
+                                    <flux:button.group>
+                                        <flux:button size="sm" variant="subtle" wire:click="incrementVote({{ $vote->id }})">+</flux:button>
+                                        <flux:button size="sm" variant="subtle" wire:click="decrementVote({{ $vote->id }})">−</flux:button>
+                                    </flux:button.group>
                                     <flux:button size="sm" variant="ghost" href="/votes/{{ $vote->getKey() }}/show">View</flux:button>
                                     <flux:button size="sm" variant="subtle" href="{{ route('votes.edit', $vote) }}">Edit</flux:button>
                                     <flux:button
